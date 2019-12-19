@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using SportsStore.Models;
-using System;
 using System.Linq;
 
 namespace SportsStore.Controllers
@@ -16,12 +15,26 @@ namespace SportsStore.Controllers
             cart = cartService;
         }
 
+        public ViewResult List() => View(repository.Orders.Where(o => !o.Shipped));
+
+        [HttpPost]
+        public IActionResult MarkShipped(int orderID)
+        {
+            Order order = repository.Orders.FirstOrDefault(o => o.OrderID == orderID);
+            if (order != null)
+            {
+                order.Shipped = true;
+                repository.SaveOrder(order);
+            }
+            return RedirectToAction(nameof(List));
+        }
+
         public ViewResult Checkout() => View(new Order());
 
         [HttpPost]
         public IActionResult Checkout(Order order)
         {
-            if(cart.Lines.Count() == 0)
+            if (cart.Lines.Count() == 0)
             {
                 ModelState.AddModelError("", "Sorry, your cart is empty!");
             }
@@ -37,7 +50,7 @@ namespace SportsStore.Controllers
             }
         }
 
-        private object Completed()
+        public ViewResult Completed()
         {
             cart.Clear();
             return View();
