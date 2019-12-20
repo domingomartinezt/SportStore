@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Moq;
 using SportsStore.Controllers;
 using SportsStore.Models;
@@ -35,7 +36,123 @@ namespace SportsStore.Tests
             Assert.Equal("P3", result[2].Name);
         }
 
-        private T GetViewModel<T> (IActionResult result) where T : class
+        [Fact]
+        public void Can_Edit_Product()
+        {
+            // Arrange - create the mock repository
+            Mock<IProductRepository> mock = new Mock<IProductRepository>();
+            mock.Setup(p => p.Products).Returns(new Product[]
+            {
+                new Product { ProductId = 1, Name = "P1" },
+                new Product { ProductId = 2, Name = "P1" },
+                new Product { ProductId = 3, Name = "P1" }
+            }.AsQueryable<Product>);
+
+            // Arrange - create the controler
+            AdminController target = new AdminController(mock.Object);
+
+            // Act
+            Product p1 = GetViewModel<Product>(target.Edit(1));
+            Product p2 = GetViewModel<Product>(target.Edit(2));
+            Product p3 = GetViewModel<Product>(target.Edit(3));
+
+            // Assert
+            Assert.Equal(1, p1.ProductId);
+            Assert.Equal(2, p2.ProductId);
+            Assert.Equal(3, p3.ProductId);
+        }
+
+        [Fact]
+        public void Can_Edit_Nonexistent_Product()
+        {
+            // Arrange - create the mock repository
+            Mock<IProductRepository> mock = new Mock<IProductRepository>();
+            mock.Setup(p => p.Products).Returns(new Product[]
+            {
+                new Product { ProductId = 1, Name = "P1" },
+                new Product { ProductId = 2, Name = "P1" },
+                new Product { ProductId = 3, Name = "P1" }
+            }.AsQueryable<Product>);
+
+            // Arrange - create the controler
+            AdminController target = new AdminController(mock.Object);
+
+            // Act
+            Product p1 = GetViewModel<Product>(target.Edit(4));
+
+            // Assert
+            Assert.Null(p1);
+        }
+
+        [Fact]
+        public void Can_Save_Valid_Changes()
+        {
+            // Arrange - create mock respository
+            Mock<IProductRepository> mock = new Mock<IProductRepository>();
+            // Arrange - create mock temp data
+            Mock<ITempDataDictionary> temData = new Mock<ITempDataDictionary>();
+            // Arrange - create the controller
+            AdminController target = new AdminController(mock.Object)
+            {
+                TempData = temData.Object
+            };
+            //Arrange - create a product
+            Product product = new Product { Name = "Test" };
+
+            // Act - try ti save the product
+            IActionResult result = target.Edit(product);
+
+            // Assert - check that the repository was called
+            mock.Verify(m => m.SaveProduct(product));
+            // Assert - check the result type is a redirection
+            Assert.IsType<RedirectToActionResult>(result);
+            Assert.Equal("Index", (result as RedirectToActionResult).ActionName);         
+        }
+
+        [Fact]
+        public void Cannot_Save_Invalid_Changes()
+        {
+            // Arrange - create mock respository
+            Mock<IProductRepository> mock = new Mock<IProductRepository>();
+            // Arrange - create the controller
+            AdminController target = new AdminController(mock.Object);
+            // Arrange - create a product
+            Product product = new Product { Name = "Test" };
+            // Arrange - add an error to the model state
+            target.ModelState.AddModelError("error", "error");
+
+            // Act - try ti save the product
+            IActionResult result = target.Edit(product);
+
+            // Assert - check that the repository was not called
+            mock.Verify(m => m.SaveProduct(It.IsAny<Product>()), Times.Never());
+            // Assert - check the result type is a redirection
+            Assert.IsType<ViewResult>(result);
+        }
+
+        [Fact]
+        public void Can_Delete_Valid_Product()
+        {
+            // Arrange - create a product
+            Product prod = new Product { ProductId = 2, Name = "Test" };
+            // Arrange - create mock respository
+            Mock<IProductRepository> mock = new Mock<IProductRepository>();
+            mock.Setup(m => m.Products).Returns(new Product[]{
+                new Product {ProductId=1, Name="P1"},
+                prod,
+                new Product {ProductId=3, Name="P3" } }.AsQueryable<Product>);
+
+            // Arrange - create the controller
+            AdminController target = new AdminController(mock.Object);
+
+            // Act - delete the product
+            target.Delete(prod.ProductId);
+
+            // Assert - ensure that the repository delete method was called with the correct product
+            mock.Verify(m => m.DeleteProduct(prod.ProductId));
+        }
+
+        private T GetViewModel<T>(IActionResult result) where T : class
         {
             return (result as ViewResult)?.ViewData.Model as T;
         }
